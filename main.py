@@ -1,10 +1,10 @@
-##### Hyperparameters ##########################################################
+##### Hyperparameters #####
 img_size = 576
 lr = 0.0002
 epoch = 100
 batchs = 2
 gpus = 1
-################################################################################
+###########################
 from unet import *
 import numpy as np
 import argparse
@@ -12,14 +12,11 @@ import torchvision
 import torch
 from kuzushiji_get_targets import KuzushijiDataLoader
 import random
-import time
 import sys
-
 from tqdm import tqdm
 import mlcrate as mlc
 import lycon
 from math import isnan
-
 from torchvision import datasets
 
 class ImageFolder(datasets.ImageFolder):
@@ -47,7 +44,6 @@ prev_test = 1
 kuzu_targets = KuzushijiDataLoader()
 
 kuzu = './input'
-
 
 transforms = [torchvision.transforms.Resize((img_size,img_size)), torchvision.transforms.ToTensor()]
 transforms_keep = [torchvision.transforms.Resize((32,32)), torchvision.transforms.ToTensor()]
@@ -100,11 +96,6 @@ gen_optimizer = torch.optim.Adam(generator.parameters(), lr=lr, betas=(0.9,0.999
 def overlay(fg, bg, alpha=0.3):
     return fg * alpha + bg * (1-alpha)
 
-import pandas as pd
-
-train_loss_csv = []
-test_loss_csv = []
-
 for i in range(epoch): 
     train_losses = []
     test_losses = []
@@ -122,9 +113,6 @@ for i in range(epoch):
     print(' / 　 づ')
     
     for iteration, (images, labels, file_locs) in enumerate(img_batch):
-        loss_temp = pd.DataFrame()
-        t0 = time.time()
-
         satel_images = images * 1.0
 
         img_files = [file_loc.split('/')[3].rstrip('.jpg') for file_loc in file_locs]
@@ -155,7 +143,6 @@ for i in range(epoch):
         map_image = torch.cat(map_images)
         prox_true = torch.cat(prox_trues)
 
-        t0 = time.time()
         gen_optimizer.zero_grad()
 
         x = Variable(satel_images[image_mask]).cuda(0)
@@ -178,21 +165,6 @@ for i in range(epoch):
         bar.set_description('train_loss {:.5f} test_loss {:.5f}'.format(np.mean(train_losses), np.mean(test_losses)))
                    
         if iteration % 100 == 0:
-            
-            if isnan(np.mean(train_losses)):
-                train_loss_csv.append(0)
-            else:
-                train_loss_csv.append(np.mean(train_losses))
-    
-            if isnan(np.mean(test_losses)):
-                test_loss_csv.append(0)
-            else:
-                test_loss_csv.append(np.mean(test_losses))
-    
-            loss_temp["train_loss"] = train_loss_csv
-            loss_temp["test_loss"] = test_loss_csv
-            loss_temp.to_csv('loss_value.csv', index = False)
-            
             x = x.cpu().data
             ysum = y.cpu().data.max(dim=1,keepdim=True)[0].repeat(1,3,1,1)
             ysum_ = y_.cpu().data.max(dim=1,keepdim=True)[0].repeat(1,3,1,1)
