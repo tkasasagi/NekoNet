@@ -2,21 +2,16 @@
 img_size = 576
 lr = 0.0002
 epoch = 100
-batchs = 1
+batchs = 2
 gpus = 1
 ################################################################################
 from unet import *
 import numpy as np
-
 import argparse
 import torchvision
 import torch
-from image_folder import ImageFolderWithPaths as ImageFolder
 from kuzushiji_get_targets import KuzushijiDataLoader
 import random
-
-from torchvision.utils import save_image
-
 import time
 import sys
 
@@ -24,6 +19,20 @@ from tqdm import tqdm
 import mlcrate as mlc
 import lycon
 from math import isnan
+
+from torchvision import datasets
+
+class ImageFolder(datasets.ImageFolder):
+
+    # override the __getitem__ method. this is the method dataloader calls
+    def __getitem__(self, index):
+        # this is what ImageFolder normally returns 
+        original_tuple = super(ImageFolder, self).__getitem__(index)
+        # the image file path
+        path = self.imgs[index][0]
+        # make a new tuple that includes original and the path
+        tuple_with_path = (original_tuple + (path,))
+        return tuple_with_path
 
 parser = argparse.ArgumentParser()
 
@@ -93,11 +102,9 @@ def overlay(fg, bg, alpha=0.3):
 
 import pandas as pd
 
-epoch_csv = []
 train_loss_csv = []
 test_loss_csv = []
 
-file = open('./{}_mse_loss'.format('unet'), 'w')
 for i in range(epoch): 
     train_losses = []
     test_losses = []
@@ -157,7 +164,6 @@ for i in range(epoch):
         y, prox_pred = generator.forward(x)
 
         loss = recon_loss_func(y, y_) + 0.1 * recon_loss_func(prox_pred, prox_true)
-        file.write(str(loss) + "\n")
 
         loss.backward()
         if not is_test:
@@ -182,10 +188,7 @@ for i in range(epoch):
                 test_loss_csv.append(0)
             else:
                 test_loss_csv.append(np.mean(test_losses))
-            
-            epoch_csv.append(i)
     
-            loss_temp["epoch"] = epoch_csv
             loss_temp["train_loss"] = train_loss_csv
             loss_temp["test_loss"] = test_loss_csv
             loss_temp.to_csv('loss_value.csv', index = False)
